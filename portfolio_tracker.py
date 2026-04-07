@@ -32,9 +32,21 @@ selected_tf = st.selectbox("Chart Timeframe", options=list(timeframes.keys()), i
 
 # Fetch data
 tickers = list(portfolio.keys()) + ["SPY", "USDCAD=X"]
-data = yf.download(tickers, period=timeframes[selected_tf], interval="1d")['Adj Close']
+# Fetch data - fixed for 2026 yfinance changes
+data = yf.download(tickers, period=timeframes[selected_tf], interval="1d", 
+                   auto_adjust=False, group_by='ticker', threads=True)
 
-current_prices = data.iloc[-1] if not data.empty else pd.Series()
+# Handle both old and new yfinance output formats safely
+if isinstance(data.columns, pd.MultiIndex):
+    # New multi-level structure: use Close as adjusted price
+    close_col = 'Close'
+else:
+    close_col = 'Adj Close' if 'Adj Close' in data.columns else 'Close'
+
+# Use Close prices (already adjusted in most cases)
+prices = data[close_col] if isinstance(data.columns, pd.MultiIndex) else data
+
+current_prices = prices.iloc[-1] if not prices.empty else pd.Series()
 
 # Calculate live values
 rows = []

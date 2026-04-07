@@ -5,24 +5,24 @@ from datetime import datetime
 import plotly.graph_objects as go
 
 st.set_page_config(page_title="TFSA 10-Stock Tracker", layout="wide")
-st.title("🚀 Your $5k TFSA 10-Stock Portfolio Tracker vs SPY")
+st.title("🚀 Your $10k TFSA 10-Stock Portfolio Tracker vs SPY")
 st.caption(f"Live as of {datetime.now().strftime('%Y-%m-%d %H:%M')} | **Entry Date: April 7, 2026 close** | Benchmark: SPY")
 
-# 10 Highest-Conviction Positions (today's entry)
+# $10,000 CAD total - even split $1,000 per name
 portfolio = {
-    "NVDA":  {"entry_cad": 700, "shares": 3.95, "currency": "USD"},
-    "AVGO":  {"entry_cad": 650, "shares": 2.06, "currency": "USD"},
-    "CLS.TO":{"entry_cad": 600, "shares": 1.46, "currency": "CAD"},
-    "SHOP.TO":{"entry_cad": 550, "shares": 3.33, "currency": "CAD"},
-    "KXS.TO":{"entry_cad": 500, "shares": 3.50, "currency": "CAD"},
-    "PLTR":  {"entry_cad": 450, "shares": 2.90, "currency": "USD"},
-    "ARM":   {"entry_cad": 450, "shares": 3.00, "currency": "USD"},
-    "CRWD":  {"entry_cad": 400, "shares": 1.00, "currency": "USD"},
-    "RKLB":  {"entry_cad": 400, "shares": 5.88, "currency": "USD"},
-    "RTX":   {"entry_cad": 300, "shares": 2.31, "currency": "USD"},
+    "NVDA":  {"entry_cad": 1000, "shares": 5.64, "currency": "USD"},
+    "AVGO":  {"entry_cad": 1000, "shares": 3.17, "currency": "USD"},
+    "CLS.TO":{"entry_cad": 1000, "shares": 2.43, "currency": "CAD"},
+    "SHOP.TO":{"entry_cad": 1000, "shares": 6.06, "currency": "CAD"},
+    "KXS.TO":{"entry_cad": 1000, "shares": 7.00, "currency": "CAD"},
+    "PLTR":  {"entry_cad": 1000, "shares": 6.44, "currency": "USD"},
+    "ARM":   {"entry_cad": 1000, "shares": 6.67, "currency": "USD"},
+    "CRWD":  {"entry_cad": 1000, "shares": 2.50, "currency": "USD"},
+    "RKLB":  {"entry_cad": 1000, "shares": 14.70, "currency": "USD"},
+    "RTX":   {"entry_cad": 1000, "shares": 7.70, "currency": "USD"},
 }
 
-entry_total_cad = 5000.0
+entry_total_cad = 10000.0
 start_date = "2026-04-07"
 
 timeframes = {"1D": "1d", "5D": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo", "YTD": "ytd", "MAX": "max"}
@@ -40,11 +40,9 @@ data = {t: get_history(t, timeframes[selected_tf]) for t in tickers}
 
 current_prices = {t: df['Close'].iloc[-1] if not df.empty else 0 for t, df in data.items()}
 
-# Anchor to today's close for SPY
 spy_df = data["SPY"]
 spy_entry_price = spy_df['Close'].iloc[0] if not spy_df.empty else current_prices.get("SPY", 658.0)
 
-# Portfolio calculations
 rows = []
 total_value_cad = 0.0
 for ticker, info in portfolio.items():
@@ -68,17 +66,14 @@ for ticker, info in portfolio.items():
 df = pd.DataFrame(rows)
 portfolio_return = ((total_value_cad - entry_total_cad) / entry_total_cad) * 100
 spy_current = current_prices.get("SPY", spy_entry_price)
-
-# Safe return calculation (0% on Day 1)
 spy_return = ((spy_current - spy_entry_price) / spy_entry_price * 100) if abs(spy_current - spy_entry_price) > 0.01 else 0.0
 alpha = portfolio_return - spy_return
 
-# Chart first
+# Chart at top
 st.subheader("Portfolio vs SPY Cumulative Return (since April 7 close)")
 if not spy_df.empty:
     hist = pd.DataFrame(index=spy_df.index)
     hist["SPY"] = spy_df['Close'] / spy_entry_price if spy_entry_price != 0 else 1.0
-    
     port_values = []
     for idx in hist.index:
         val = 0.0
@@ -123,10 +118,10 @@ st.dataframe(
     hide_index=True
 )
 
-# Advanced Metrics
+# Advanced Metrics (safe check)
 with st.expander("📊 Advanced Performance Metrics"):
     st.write("Since April 7 close")
-    if len(hist) > 5:
+    if 'hist' in locals() and len(hist) > 5:
         port_ret = hist["Portfolio"].pct_change().dropna()
         spy_ret = hist["SPY"].pct_change().dropna()
         correlation = port_ret.corr(spy_ret) if len(port_ret) > 1 else 0
@@ -141,29 +136,21 @@ with st.expander("📊 Advanced Performance Metrics"):
         m4.metric("Sharpe Ratio", f"{sharpe:.2f}")
         st.metric("Max Drawdown", f"{max_dd:.1f}%")
 
-# Market Condition Alert (new functionality)
+# Market Condition Alert
 st.subheader("⚠️ Market Condition Alert")
-st.caption("I will flag here when it's time to consider trimming or exiting any position based on thesis breaks or major macro shifts.")
-st.info("**Current Status: HOLD ALL** — No thesis breaks. AI capex and defense/space tailwinds remain intact. Monitor daily.")
+st.info("**Current Status: HOLD ALL** — No thesis breaks. AI capex and defense/space tailwinds intact. I will flag here immediately if conditions change and it's time to trim or exit any position.")
 
 # News
 st.subheader("📰 Latest News & World Events Impact")
 st.caption("Real-time headlines + macro summary")
 news_tickers = ["NVDA", "AVGO", "PLTR", "CRWD", "RKLB", "RTX", "SPY"]
-news_found = False
 for t in news_tickers:
     try:
         news_list = yf.Ticker(t).news
         if news_list:
             for item in news_list[:2]:
                 st.write(f"**{t}**: {item.get('title', 'No title')}")
-                news_found = True
     except:
         pass
-if not news_found:
-    st.info("News feed temporarily limited. Key points:")
-    st.write("• Iran conflict supporting defense/space (RTX, RKLB)")
-    st.write("• AI infrastructure spend resilient")
-    st.write("• SpaceX IPO momentum positive for RKLB")
 
-st.caption("Refresh the page for live updates. This tracker is built specifically for your concentrated 10-stock TFSA to beat the S&P 500 over 3+ years.")
+st.caption("Refresh page for live data. This tracker is built for your $10k concentrated TFSA to beat the S&P 500 over 3+ years.")

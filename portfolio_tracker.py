@@ -8,7 +8,7 @@ st.set_page_config(page_title="TFSA 10-Stock Tracker", layout="wide")
 st.title("🚀 Your $5k TFSA 10-Stock Portfolio Tracker vs SPY")
 st.caption(f"Live as of {datetime.now().strftime('%Y-%m-%d %H:%M')} | **Start Date: April 7, 2026** | Benchmark: SPY")
 
-# === 10 HIGHEST-CONVICTION POSITIONS ===
+# 10 Highest-Conviction Positions
 portfolio = {
     "NVDA":  {"entry_cad": 700, "shares": 3.95, "currency": "USD"},
     "AVGO":  {"entry_cad": 650, "shares": 2.06, "currency": "USD"},
@@ -40,9 +40,9 @@ data = {t: get_history(t, timeframes[selected_tf]) for t in tickers}
 
 current_prices = {t: df['Close'].iloc[-1] if not df.empty else 0 for t, df in data.items()}
 
-# Anchor SPY entry price to first trading day after April 7
+# Safe SPY entry price (first available close after April 7)
 spy_df = data["SPY"]
-spy_entry_price = spy_df['Close'].iloc[0] if not spy_df.empty else current_prices.get("SPY", 658.0)
+spy_entry_price = spy_df['Close'].iloc[0] if not spy_df.empty else 658.0
 
 # Portfolio calculations
 rows = []
@@ -68,14 +68,20 @@ for ticker, info in portfolio.items():
 df = pd.DataFrame(rows)
 portfolio_return = ((total_value_cad - entry_total_cad) / entry_total_cad) * 100
 spy_current = current_prices.get("SPY", spy_entry_price)
-spy_return = ((spy_current - spy_entry_price) / spy_entry_price) * 100
+
+# Safe return calculation (avoid division by zero)
+if abs(spy_current - spy_entry_price) < 0.01:
+    spy_return = 0.0
+else:
+    spy_return = ((spy_current - spy_entry_price) / spy_entry_price) * 100
+
 alpha = portfolio_return - spy_return
 
 # Chart at top
 st.subheader("Portfolio vs SPY Cumulative Return (since April 7, 2026)")
 if not spy_df.empty:
     hist = pd.DataFrame(index=spy_df.index)
-    hist["SPY"] = spy_df['Close'] / spy_entry_price
+    hist["SPY"] = spy_df['Close'] / spy_entry_price if spy_entry_price != 0 else 1.0
     
     port_values = []
     for idx in hist.index:
@@ -104,12 +110,10 @@ col3.metric("**Alpha vs SPY**", f"{alpha:+.2f}%", "Outperformance since start da
 col4.metric("Positions", "10")
 col5.metric("Deployed", "100%")
 
-# Color-coded P&L table
+# Color-coded table
 def color_pnl(val):
-    if val > 0:
-        return 'color: #00ff88'
-    elif val < 0:
-        return 'color: #ff4444'
+    if val > 0: return 'color: #00ff88'
+    elif val < 0: return 'color: #ff4444'
     return 'color: white'
 
 st.dataframe(
@@ -162,4 +166,4 @@ if not news_found:
     st.write("• SpaceX IPO momentum building")
     st.write("• Oil ~$110 supporting related names")
 
-st.caption("Refresh for live data. Built specifically for your 10-stock TFSA to beat the S&P 500 over 3+ years.")
+st.caption("Refresh for live data. This tracker is built for your 10-stock TFSA to beat the S&P 500 over 3+ years.")

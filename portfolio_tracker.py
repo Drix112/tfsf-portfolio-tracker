@@ -8,18 +8,18 @@ st.set_page_config(page_title="TFSA 10-Stock Tracker", layout="wide")
 st.title("🚀 Your $10k TFSA 10-Stock Portfolio Tracker vs SPY")
 st.caption(f"Live as of {datetime.now().strftime('%Y-%m-%d %H:%M')} | **Entry: April 7, 2026 close** | Benchmark: SPY")
 
-# $10,000 CAD total - $1,000 per name (shares calculated from April 7 closes)
+# $10,000 CAD - $1,000 per name (shares from April 7 closes)
 portfolio = {
-    "NVDA":  {"entry_cad": 1000, "shares": 4.05, "currency": "USD"},
-    "AVGO":  {"entry_cad": 1000, "shares": 2.29, "currency": "USD"},
-    "CLS.TO":{"entry_cad": 1000, "shares": 2.46, "currency": "CAD"},
-    "SHOP.TO":{"entry_cad": 1000, "shares": 6.05, "currency": "CAD"},
-    "KXS.TO":{"entry_cad": 1000, "shares": 7.02, "currency": "CAD"},
-    "PLTR":  {"entry_cad": 1000, "shares": 4.86, "currency": "USD"},
-    "ARM":   {"entry_cad": 1000, "shares": 4.84, "currency": "USD"},
-    "CRWD":  {"entry_cad": 1000, "shares": 1.81, "currency": "USD"},
-    "RKLB":  {"entry_cad": 1000, "shares": 10.63, "currency": "USD"},
-    "RTX":   {"entry_cad": 1000, "shares": 3.63, "currency": "USD"},
+    "NVDA":  {"entry_cad": 1000, "shares": 5.64, "currency": "USD"},
+    "AVGO":  {"entry_cad": 1000, "shares": 3.17, "currency": "USD"},
+    "CLS.TO":{"entry_cad": 1000, "shares": 2.43, "currency": "CAD"},
+    "SHOP.TO":{"entry_cad": 1000, "shares": 6.06, "currency": "CAD"},
+    "KXS.TO":{"entry_cad": 1000, "shares": 7.00, "currency": "CAD"},
+    "PLTR":  {"entry_cad": 1000, "shares": 6.44, "currency": "USD"},
+    "ARM":   {"entry_cad": 1000, "shares": 6.67, "currency": "USD"},
+    "CRWD":  {"entry_cad": 1000, "shares": 2.50, "currency": "USD"},
+    "RKLB":  {"entry_cad": 1000, "shares": 14.70, "currency": "USD"},
+    "RTX":   {"entry_cad": 1000, "shares": 7.70, "currency": "USD"},
 }
 
 entry_total_cad = 10000.0
@@ -27,7 +27,7 @@ entry_total_cad = 10000.0
 timeframes = {"1D": "1d", "5D": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo", "YTD": "ytd", "MAX": "max"}
 selected_tf = st.selectbox("📅 Chart Timeframe", options=list(timeframes.keys()), index=0)
 
-@st.cache_data(ttl=180)
+@st.cache_data(ttl=60)
 def get_data(ticker, period):
     try:
         return yf.Ticker(ticker).history(period=period)
@@ -56,8 +56,8 @@ for ticker, info in portfolio.items():
         "Shares": round(info["shares"], 4),
         "Price": round(price, 2),
         "Value CAD": round(value_cad, 0),
-        "P&L CAD": round(pnl, 0),
-        "P&L %": round(pnl_pct, 1),
+        "P&L CAD": round(pnl, 2),
+        "P&L %": round(pnl_pct, 2),
         "Weight %": weight
     })
     total_value_cad += value_cad
@@ -68,7 +68,7 @@ spy_current = current_prices.get("SPY", spy_entry_price)
 spy_return = ((spy_current - spy_entry_price) / spy_entry_price * 100) if abs(spy_current - spy_entry_price) > 0.01 else 0.0
 alpha = portfolio_return - spy_return
 
-# Chart at top
+# Chart at top (full day from April 6 onward)
 st.subheader("Portfolio vs SPY Cumulative Return (since April 7 close)")
 if not spy_df.empty:
     hist = pd.DataFrame(index=spy_df.index)
@@ -100,7 +100,7 @@ col3.metric("**Alpha vs SPY**", f"{alpha:+.2f}%", "Outperformance since entry")
 col4.metric("Positions", "10")
 col5.metric("Deployed", "100%")
 
-# Color-coded table
+# Color-coded P&L table (2 decimal places)
 def color_pnl(val):
     if val > 0: return 'color: #00ff88'
     elif val < 0: return 'color: #ff4444'
@@ -109,8 +109,8 @@ def color_pnl(val):
 st.dataframe(
     df.style.format({
         "Value CAD": "C${:,.0f}", 
-        "P&L CAD": "C${:,.0f}", 
-        "P&L %": "{:+.1f}%", 
+        "P&L CAD": "C${:,.2f}", 
+        "P&L %": "{:+.2f}%", 
         "Weight %": "{:.1f}%"
     }).map(color_pnl, subset=["P&L %"]),
     use_container_width=True, 
@@ -137,27 +137,6 @@ with st.expander("📊 Advanced Performance Metrics"):
 
 # Market Condition Alert
 st.subheader("⚠️ Market Condition Alert")
-st.info("**Current Status: HOLD ALL** — No thesis breaks. I will flag here immediately if market conditions change and it's time to trim or exit any position.")
-
-# News
-st.subheader("📰 Latest News & World Events Impact")
-st.caption("Real-time headlines + macro summary")
-news_tickers = ["NVDA", "AVGO", "PLTR", "CRWD", "RKLB", "RTX", "SPY"]
-news_found = False
-for t in news_tickers:
-    try:
-        news_list = yf.Ticker(t).news
-        if news_list:
-            for item in news_list[:2]:
-                st.write(f"**{t}**: {item.get('title', 'No title')}")
-                news_found = True
-    except:
-        pass
-if not news_found:
-    st.info("News feed temporarily limited. Key macro points:")
-    st.write("• Iran conflict supporting RTX & RKLB")
-    st.write("• AI infrastructure capex remains strong")
-    st.write("• SpaceX IPO momentum positive for RKLB")
-    st.write("• Oil ~$110 supporting related names")
+st.info("**Current Status: HOLD ALL** — No thesis breaks. I will flag here immediately if it's time to trim or exit any position.")
 
 st.caption("Refresh page for live daily updates. This tracker is built for your $10k concentrated TFSA to beat the S&P 500 over 3+ years.")

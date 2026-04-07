@@ -6,9 +6,9 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="TFSA 10-Stock Tracker", layout="wide")
 st.title("🚀 Your $5k TFSA 10-Stock Portfolio Tracker vs SPY")
-st.caption(f"Live as of {datetime.now().strftime('%Y-%m-%d %H:%M')} | **Start Date: April 2, 2026** | Benchmark: SPY")
+st.caption(f"Live as of {datetime.now().strftime('%Y-%m-%d %H:%M')} | **Start Date: April 7, 2026** | Benchmark: SPY")
 
-# === 10 HIGHEST-CONVICTION POSITIONS (April 6 targets) ===
+# === 10 HIGHEST-CONVICTION POSITIONS ===
 portfolio = {
     "NVDA":  {"entry_cad": 700, "shares": 3.95, "currency": "USD"},
     "AVGO":  {"entry_cad": 650, "shares": 2.06, "currency": "USD"},
@@ -23,16 +23,16 @@ portfolio = {
 }
 
 entry_total_cad = 5000.0
-start_date = "2026-04-02"
-spy_entry_price = 6583.0
+start_date = "2026-04-07"
+spy_entry_price = 6583.0  # Adjust if needed after today's close
 
 timeframes = {"1D": "1d", "5D": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo", "YTD": "ytd", "MAX": "max"}
-selected_tf = st.selectbox("📅 Chart Timeframe", options=list(timeframes.keys()), index=6)
+selected_tf = st.selectbox("📅 Chart Timeframe", options=list(timeframes.keys()), index=3)
 
-@st.cache_data(ttl=180)  # 3-minute cache
+@st.cache_data(ttl=180)
 def get_history(ticker, period):
     try:
-        return yf.Ticker(ticker).history(period=period, start=start_date if period == "max" else None)
+        return yf.Ticker(ticker).history(period=period)
     except:
         return pd.DataFrame()
 
@@ -68,19 +68,8 @@ spy_current = current_prices.get("SPY", spy_entry_price)
 spy_return = ((spy_current - spy_entry_price) / spy_entry_price) * 100
 alpha = portfolio_return - spy_return
 
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Portfolio Value", f"C${total_value_cad:,.0f}", f"{portfolio_return:+.2f}%")
-col2.metric("SPY Return (since Apr 2)", f"{spy_return:+.2f}%")
-col3.metric("**Alpha vs SPY**", f"{alpha:+.2f}%", "Outperformance since start date")
-col4.metric("Positions", "10")
-col5.metric("Deployed", "100%")
-
-st.dataframe(df.style.format({
-    "Value CAD": "C${:,.0f}", "P&L CAD": "C${:,.0f}", "P&L %": "{:+.1f}%", "Weight %": "{:.1f}%"
-}), use_container_width=True, hide_index=True)
-
-# Chart (only trading days, from start date)
-st.subheader("Portfolio vs SPY Cumulative Return (since April 2, 2026)")
+# Chart first (as requested)
+st.subheader("Portfolio vs SPY Cumulative Return (since April 7, 2026)")
 if any(not d.empty for d in data.values()):
     spydf = data["SPY"]
     if not spydf.empty:
@@ -106,7 +95,50 @@ if any(not d.empty for d in data.values()):
         fig.update_layout(height=500, template="plotly_dark", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
         st.plotly_chart(fig, use_container_width=True)
 
-# News with improved fetching
+# Metrics row
+col1, col2, col3, col4, col5 = st.columns(5)
+col1.metric("Portfolio Value", f"C${total_value_cad:,.0f}", f"{portfolio_return:+.2f}%")
+col2.metric("SPY Return (since Apr 7)", f"{spy_return:+.2f}%")
+col3.metric("**Alpha vs SPY**", f"{alpha:+.2f}%", "Outperformance since start date")
+col4.metric("Positions", "10")
+col5.metric("Deployed", "100%")
+
+# P&L Table with color coding
+def color_pnl(val):
+    color = "green" if val > 0 else "red" if val < 0 else "white"
+    return f'color: {color}'
+
+st.dataframe(
+    df.style.format({
+        "Value CAD": "C${:,.0f}", 
+        "P&L CAD": "C${:,.0f}", 
+        "P&L %": "{:+.1f}%", 
+        "Weight %": "{:.1f}%"
+    }).applymap(color_pnl, subset=["P&L %"]),
+    use_container_width=True, 
+    hide_index=True
+)
+
+# Advanced Metrics
+with st.expander("📊 Advanced Performance Metrics"):
+    st.write("Since April 7, 2026 (using available trading days)")
+    if len(hist) > 5:
+        port_ret = hist["Portfolio"].pct_change().dropna()
+        spy_ret = hist["SPY"].pct_change().dropna()
+        correlation = port_ret.corr(spy_ret) if len(port_ret) > 1 else 0
+        beta = (port_ret.cov(spy_ret) / spy_ret.var()) if spy_ret.var() != 0 else 0
+        vol = port_ret.std() * 100 * (252**0.5)**0.5  # rough annualization
+        sharpe = (port_ret.mean() / port_ret.std()) * (252**0.5) if port_ret.std() != 0 else 0
+        max_dd = ((hist["Portfolio"] / hist["Portfolio"].cummax()) - 1).min() * 100
+        
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Beta", f"{beta:.2f}")
+        m2.metric("Annualized Volatility", f"{vol:.1f}%")
+        m3.metric("Correlation to SPY", f"{correlation:.2f}")
+        m4.metric("Sharpe Ratio", f"{sharpe:.2f}")
+        st.metric("Max Drawdown", f"{max_dd:.1f}%")
+
+# News Section (improved)
 st.subheader("📰 Latest News & World Events Impact")
 st.caption("Real-time headlines + macro summary (Iran war, AI capex, SpaceX IPO, oil ~$110)")
 
@@ -115,7 +147,7 @@ news_found = False
 for t in news_tickers:
     try:
         news_list = yf.Ticker(t).news
-        if news_list:
+        if news_list and len(news_list) > 0:
             for item in news_list[:2]:
                 title = item.get('title', 'No title')
                 st.write(f"**{t}**: {title}")
@@ -124,10 +156,11 @@ for t in news_tickers:
         pass
 
 if not news_found:
-    st.info("News feed temporarily limited — here are key macro points:")
-    st.write("• Iran war uncertainty continues to support defense/space budgets (RTX, RKLB)")
-    st.write("• AI infrastructure capex remains resilient (NVDA, AVGO, CLS.TO)")
-    st.write("• SpaceX IPO momentum building (positive for RKLB)")
-    st.write("• Oil holding ~$110 providing energy-related tailwinds")
+    st.info("News feed temporarily limited. Key macro points right now:")
+    st.write("• Ongoing Iran conflict → positive tailwinds for RTX & RKLB (defense/space)")
+    st.write("• AI infrastructure capex remains strong (NVDA, AVGO, CLS.TO, ARM)")
+    st.write("• SpaceX IPO momentum building (beneficial for RKLB)")
+    st.write("• Oil holding near $110 providing energy-related support")
 
-st.caption("Refresh page for latest data. This tracker is built specifically for your 10-stock TFSA experiment to beat the S&P 500 over 3+ years.")
+st.caption("Refresh the page for latest live data. This tracker is built specifically for your concentrated 10-stock TFSA to beat the S&P 500 over 3+ years.")
+

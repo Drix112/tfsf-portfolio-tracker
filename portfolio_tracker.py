@@ -24,7 +24,6 @@ portfolio = {
 
 entry_total_cad = 5000.0
 start_date = "2026-04-07"
-spy_entry_price = 6583.0  # Adjust if needed after today's close
 
 timeframes = {"1D": "1d", "5D": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo", "YTD": "ytd", "MAX": "max"}
 selected_tf = st.selectbox("📅 Chart Timeframe", options=list(timeframes.keys()), index=3)
@@ -32,7 +31,7 @@ selected_tf = st.selectbox("📅 Chart Timeframe", options=list(timeframes.keys(
 @st.cache_data(ttl=180)
 def get_history(ticker, period):
     try:
-        return yf.Ticker(ticker).history(period=period)
+        return yf.Ticker(ticker).history(period=period, start=start_date)
     except:
         return pd.DataFrame()
 
@@ -40,6 +39,10 @@ tickers = list(portfolio.keys()) + ["SPY", "USDCAD=X"]
 data = {t: get_history(t, timeframes[selected_tf]) for t in tickers}
 
 current_prices = {t: df['Close'].iloc[-1] if not df.empty else 0 for t, df in data.items()}
+
+# Anchor SPY entry price to first trading day after April 7
+spy_df = data["SPY"]
+spy_entry_price = spy_df['Close'].iloc[0] if not spy_df.empty else current_prices.get("SPY", 658.0)
 
 # Portfolio calculations
 rows = []
@@ -68,34 +71,32 @@ spy_current = current_prices.get("SPY", spy_entry_price)
 spy_return = ((spy_current - spy_entry_price) / spy_entry_price) * 100
 alpha = portfolio_return - spy_return
 
-# Chart first (as requested)
+# Chart at top
 st.subheader("Portfolio vs SPY Cumulative Return (since April 7, 2026)")
-if any(not d.empty for d in data.values()):
-    spydf = data["SPY"]
-    if not spydf.empty:
-        hist = pd.DataFrame(index=spydf.index)
-        hist["SPY"] = spydf['Close'] / spy_entry_price
-        
-        port_values = []
-        for idx in hist.index:
-            val = 0.0
-            for ticker, info in portfolio.items():
-                df_t = data[ticker]
-                if idx in df_t.index:
-                    p = df_t.loc[idx]['Close']
-                    usdcad_day = data["USDCAD=X"].loc[idx]['Close'] if idx in data["USDCAD=X"].index else 1.39
-                    val += info["shares"] * p * (usdcad_day if info["currency"] == "USD" else 1)
-            port_values.append(val)
-        hist["Portfolio"] = [v / entry_total_cad for v in port_values]
-        hist = hist.dropna()
+if not spy_df.empty:
+    hist = pd.DataFrame(index=spy_df.index)
+    hist["SPY"] = spy_df['Close'] / spy_entry_price
+    
+    port_values = []
+    for idx in hist.index:
+        val = 0.0
+        for ticker, info in portfolio.items():
+            df_t = data[ticker]
+            if idx in df_t.index:
+                p = df_t.loc[idx]['Close']
+                usdcad_day = data["USDCAD=X"].loc[idx]['Close'] if idx in data["USDCAD=X"].index else 1.39
+                val += info["shares"] * p * (usdcad_day if info["currency"] == "USD" else 1)
+        port_values.append(val)
+    hist["Portfolio"] = [v / entry_total_cad for v in port_values]
+    hist = hist.dropna()
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=hist.index, y=hist["Portfolio"], name="Portfolio", line=dict(color="#00ff88", width=3)))
-        fig.add_trace(go.Scatter(x=hist.index, y=hist["SPY"], name="SPY", line=dict(color="#8888ff", width=3)))
-        fig.update_layout(height=500, template="plotly_dark", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
-        st.plotly_chart(fig, use_container_width=True)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=hist.index, y=hist["Portfolio"], name="Portfolio", line=dict(color="#00ff88", width=3)))
+    fig.add_trace(go.Scatter(x=hist.index, y=hist["SPY"], name="SPY", line=dict(color="#8888ff", width=3)))
+    fig.update_layout(height=500, template="plotly_dark", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+    st.plotly_chart(fig, use_container_width=True)
 
-# Metrics row
+# Metrics
 col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Portfolio Value", f"C${total_value_cad:,.0f}", f"{portfolio_return:+.2f}%")
 col2.metric("SPY Return (since Apr 7)", f"{spy_return:+.2f}%")
@@ -103,10 +104,13 @@ col3.metric("**Alpha vs SPY**", f"{alpha:+.2f}%", "Outperformance since start da
 col4.metric("Positions", "10")
 col5.metric("Deployed", "100%")
 
-# P&L Table with color coding
+# Color-coded P&L table
 def color_pnl(val):
-    color = "green" if val > 0 else "red" if val < 0 else "white"
-    return f'color: {color}'
+    if val > 0:
+        return 'color: #00ff88'
+    elif val < 0:
+        return 'color: #ff4444'
+    return 'color: white'
 
 st.dataframe(
     df.style.format({
@@ -114,23 +118,22 @@ st.dataframe(
         "P&L CAD": "C${:,.0f}", 
         "P&L %": "{:+.1f}%", 
         "Weight %": "{:.1f}%"
-    }).applymap(color_pnl, subset=["P&L %"]),
+    }).map(color_pnl, subset=["P&L %"]),
     use_container_width=True, 
     hide_index=True
 )
 
 # Advanced Metrics
 with st.expander("📊 Advanced Performance Metrics"):
-    st.write("Since April 7, 2026 (using available trading days)")
+    st.write("Since April 7, 2026")
     if len(hist) > 5:
         port_ret = hist["Portfolio"].pct_change().dropna()
         spy_ret = hist["SPY"].pct_change().dropna()
         correlation = port_ret.corr(spy_ret) if len(port_ret) > 1 else 0
         beta = (port_ret.cov(spy_ret) / spy_ret.var()) if spy_ret.var() != 0 else 0
-        vol = port_ret.std() * 100 * (252**0.5)**0.5  # rough annualization
-        sharpe = (port_ret.mean() / port_ret.std()) * (252**0.5) if port_ret.std() != 0 else 0
+        vol = port_ret.std() * 100 * (252 ** 0.5)
+        sharpe = (port_ret.mean() / port_ret.std()) * (252 ** 0.5) if port_ret.std() != 0 else 0
         max_dd = ((hist["Portfolio"] / hist["Portfolio"].cummax()) - 1).min() * 100
-        
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Beta", f"{beta:.2f}")
         m2.metric("Annualized Volatility", f"{vol:.1f}%")
@@ -138,29 +141,25 @@ with st.expander("📊 Advanced Performance Metrics"):
         m4.metric("Sharpe Ratio", f"{sharpe:.2f}")
         st.metric("Max Drawdown", f"{max_dd:.1f}%")
 
-# News Section (improved)
+# News
 st.subheader("📰 Latest News & World Events Impact")
 st.caption("Real-time headlines + macro summary (Iran war, AI capex, SpaceX IPO, oil ~$110)")
-
 news_tickers = ["NVDA", "AVGO", "PLTR", "CRWD", "RKLB", "RTX", "SPY"]
 news_found = False
 for t in news_tickers:
     try:
         news_list = yf.Ticker(t).news
-        if news_list and len(news_list) > 0:
+        if news_list:
             for item in news_list[:2]:
-                title = item.get('title', 'No title')
-                st.write(f"**{t}**: {title}")
+                st.write(f"**{t}**: {item.get('title', 'No title')}")
                 news_found = True
     except:
         pass
-
 if not news_found:
-    st.info("News feed temporarily limited. Key macro points right now:")
-    st.write("• Ongoing Iran conflict → positive tailwinds for RTX & RKLB (defense/space)")
-    st.write("• AI infrastructure capex remains strong (NVDA, AVGO, CLS.TO, ARM)")
-    st.write("• SpaceX IPO momentum building (beneficial for RKLB)")
-    st.write("• Oil holding near $110 providing energy-related support")
+    st.info("News feed temporarily limited. Key macro points:")
+    st.write("• Iran conflict → tailwinds for RTX & RKLB")
+    st.write("• AI infrastructure capex remains strong")
+    st.write("• SpaceX IPO momentum building")
+    st.write("• Oil ~$110 supporting related names")
 
-st.caption("Refresh the page for latest live data. This tracker is built specifically for your concentrated 10-stock TFSA to beat the S&P 500 over 3+ years.")
-
+st.caption("Refresh for live data. Built specifically for your 10-stock TFSA to beat the S&P 500 over 3+ years.")

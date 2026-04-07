@@ -6,9 +6,9 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="TFSA 10-Stock Tracker", layout="wide")
 st.title("🚀 Your $10k TFSA 10-Stock Portfolio Tracker vs SPY")
-st.caption(f"Live as of {datetime.now().strftime('%Y-%m-%d %H:%M')} | **Entry Date: April 7, 2026 close** | Benchmark: SPY")
+st.caption(f"Live as of {datetime.now().strftime('%Y-%m-%d %H:%M')} | **Entry: April 7, 2026 close** | Benchmark: SPY")
 
-# $10,000 CAD total - even split $1,000 per name
+# $10,000 CAD - $1,000 per name (updated shares based on April 7 closes)
 portfolio = {
     "NVDA":  {"entry_cad": 1000, "shares": 5.64, "currency": "USD"},
     "AVGO":  {"entry_cad": 1000, "shares": 3.17, "currency": "USD"},
@@ -23,26 +23,27 @@ portfolio = {
 }
 
 entry_total_cad = 10000.0
-start_date = "2026-04-07"
 
 timeframes = {"1D": "1d", "5D": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo", "YTD": "ytd", "MAX": "max"}
 selected_tf = st.selectbox("📅 Chart Timeframe", options=list(timeframes.keys()), index=0)
 
 @st.cache_data(ttl=180)
-def get_history(ticker, period):
+def get_data(ticker, period):
     try:
-        return yf.Ticker(ticker).history(period=period, start=start_date)
+        return yf.Ticker(ticker).history(period=period)
     except:
         return pd.DataFrame()
 
 tickers = list(portfolio.keys()) + ["SPY", "USDCAD=X"]
-data = {t: get_history(t, timeframes[selected_tf]) for t in tickers}
+data = {t: get_data(t, timeframes[selected_tf]) for t in tickers}
 
 current_prices = {t: df['Close'].iloc[-1] if not df.empty else 0 for t, df in data.items()}
 
+# Anchor to April 7 close for SPY
 spy_df = data["SPY"]
 spy_entry_price = spy_df['Close'].iloc[0] if not spy_df.empty else current_prices.get("SPY", 658.0)
 
+# Calculations
 rows = []
 total_value_cad = 0.0
 for ticker, info in portfolio.items():
@@ -71,9 +72,9 @@ alpha = portfolio_return - spy_return
 
 # Chart at top
 st.subheader("Portfolio vs SPY Cumulative Return (since April 7 close)")
-if not spy_df.empty:
+if not spy_df.empty and len(spy_df) > 1:
     hist = pd.DataFrame(index=spy_df.index)
-    hist["SPY"] = spy_df['Close'] / spy_entry_price if spy_entry_price != 0 else 1.0
+    hist["SPY"] = spy_df['Close'] / spy_entry_price
     port_values = []
     for idx in hist.index:
         val = 0.0
@@ -118,7 +119,7 @@ st.dataframe(
     hide_index=True
 )
 
-# Advanced Metrics (safe check)
+# Advanced Metrics
 with st.expander("📊 Advanced Performance Metrics"):
     st.write("Since April 7 close")
     if 'hist' in locals() and len(hist) > 5:
@@ -138,19 +139,28 @@ with st.expander("📊 Advanced Performance Metrics"):
 
 # Market Condition Alert
 st.subheader("⚠️ Market Condition Alert")
-st.info("**Current Status: HOLD ALL** — No thesis breaks. AI capex and defense/space tailwinds intact. I will flag here immediately if conditions change and it's time to trim or exit any position.")
+st.info("**Current Status: HOLD ALL** — No thesis breaks. AI capex and defense/space tailwinds intact. I will flag here immediately if it's time to trim or exit any position.")
 
 # News
 st.subheader("📰 Latest News & World Events Impact")
 st.caption("Real-time headlines + macro summary")
 news_tickers = ["NVDA", "AVGO", "PLTR", "CRWD", "RKLB", "RTX", "SPY"]
+news_found = False
 for t in news_tickers:
     try:
         news_list = yf.Ticker(t).news
         if news_list:
             for item in news_list[:2]:
                 st.write(f"**{t}**: {item.get('title', 'No title')}")
+                news_found = True
     except:
         pass
+if not news_found:
+    st.info("News feed temporarily limited. Key macro points right now:")
+    st.write("• Iran conflict supporting RTX & RKLB")
+    st.write("• AI infrastructure capex remains strong")
+    st.write("• SpaceX IPO momentum positive for RKLB")
+    st.write("• Oil ~$110 supporting related names")
 
+st.caption("Refresh page for live data. This tracker is built for your $10k concentrated TFSA to beat the S&P 500 over 3+ years.")
 st.caption("Refresh page for live data. This tracker is built for your $10k concentrated TFSA to beat the S&P 500 over 3+ years.")

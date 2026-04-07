@@ -8,18 +8,18 @@ st.set_page_config(page_title="TFSA 10-Stock Tracker", layout="wide")
 st.title("🚀 Your $10k TFSA 10-Stock Portfolio Tracker vs SPY")
 st.caption(f"Live as of {datetime.now().strftime('%Y-%m-%d %H:%M')} | **Entry: April 7, 2026 close** | Benchmark: SPY")
 
-# $10,000 CAD - $1,000 per name (updated shares based on April 7 closes)
+# $10,000 CAD total - $1,000 per name (shares calculated from April 7 closes)
 portfolio = {
-    "NVDA":  {"entry_cad": 1000, "shares": 5.64, "currency": "USD"},
-    "AVGO":  {"entry_cad": 1000, "shares": 3.17, "currency": "USD"},
-    "CLS.TO":{"entry_cad": 1000, "shares": 2.43, "currency": "CAD"},
-    "SHOP.TO":{"entry_cad": 1000, "shares": 6.06, "currency": "CAD"},
-    "KXS.TO":{"entry_cad": 1000, "shares": 7.00, "currency": "CAD"},
-    "PLTR":  {"entry_cad": 1000, "shares": 6.44, "currency": "USD"},
-    "ARM":   {"entry_cad": 1000, "shares": 6.67, "currency": "USD"},
-    "CRWD":  {"entry_cad": 1000, "shares": 2.50, "currency": "USD"},
-    "RKLB":  {"entry_cad": 1000, "shares": 14.70, "currency": "USD"},
-    "RTX":   {"entry_cad": 1000, "shares": 7.70, "currency": "USD"},
+    "NVDA":  {"entry_cad": 1000, "shares": 4.05, "currency": "USD"},
+    "AVGO":  {"entry_cad": 1000, "shares": 2.29, "currency": "USD"},
+    "CLS.TO":{"entry_cad": 1000, "shares": 2.46, "currency": "CAD"},
+    "SHOP.TO":{"entry_cad": 1000, "shares": 6.05, "currency": "CAD"},
+    "KXS.TO":{"entry_cad": 1000, "shares": 7.02, "currency": "CAD"},
+    "PLTR":  {"entry_cad": 1000, "shares": 4.86, "currency": "USD"},
+    "ARM":   {"entry_cad": 1000, "shares": 4.84, "currency": "USD"},
+    "CRWD":  {"entry_cad": 1000, "shares": 1.81, "currency": "USD"},
+    "RKLB":  {"entry_cad": 1000, "shares": 10.63, "currency": "USD"},
+    "RTX":   {"entry_cad": 1000, "shares": 3.63, "currency": "USD"},
 }
 
 entry_total_cad = 10000.0
@@ -39,11 +39,9 @@ data = {t: get_data(t, timeframes[selected_tf]) for t in tickers}
 
 current_prices = {t: df['Close'].iloc[-1] if not df.empty else 0 for t, df in data.items()}
 
-# Anchor to April 7 close for SPY
 spy_df = data["SPY"]
 spy_entry_price = spy_df['Close'].iloc[0] if not spy_df.empty else current_prices.get("SPY", 658.0)
 
-# Calculations
 rows = []
 total_value_cad = 0.0
 for ticker, info in portfolio.items():
@@ -72,9 +70,9 @@ alpha = portfolio_return - spy_return
 
 # Chart at top
 st.subheader("Portfolio vs SPY Cumulative Return (since April 7 close)")
-if not spy_df.empty and len(spy_df) > 1:
+if not spy_df.empty:
     hist = pd.DataFrame(index=spy_df.index)
-    hist["SPY"] = spy_df['Close'] / spy_entry_price
+    hist["SPY"] = spy_df['Close'] / spy_entry_price if spy_entry_price != 0 else 1.0
     port_values = []
     for idx in hist.index:
         val = 0.0
@@ -139,7 +137,7 @@ with st.expander("📊 Advanced Performance Metrics"):
 
 # Market Condition Alert
 st.subheader("⚠️ Market Condition Alert")
-st.info("**Current Status: HOLD ALL** — No thesis breaks. AI capex and defense/space tailwinds intact. I will flag here immediately if it's time to trim or exit any position.")
+st.info("**Current Status: HOLD ALL** — No thesis breaks. I will flag here immediately if market conditions change and it's time to trim or exit any position.")
 
 # News
 st.subheader("📰 Latest News & World Events Impact")
@@ -156,11 +154,10 @@ for t in news_tickers:
     except:
         pass
 if not news_found:
-    st.info("News feed temporarily limited. Key macro points right now:")
+    st.info("News feed temporarily limited. Key macro points:")
     st.write("• Iran conflict supporting RTX & RKLB")
     st.write("• AI infrastructure capex remains strong")
     st.write("• SpaceX IPO momentum positive for RKLB")
     st.write("• Oil ~$110 supporting related names")
 
-st.caption("Refresh page for live data. This tracker is built for your $10k concentrated TFSA to beat the S&P 500 over 3+ years.")
-st.caption("Refresh page for live data. This tracker is built for your $10k concentrated TFSA to beat the S&P 500 over 3+ years.")
+st.caption("Refresh page for live daily updates. This tracker is built for your $10k concentrated TFSA to beat the S&P 500 over 3+ years.")
